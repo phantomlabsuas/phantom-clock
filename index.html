@@ -7,8 +7,8 @@
   <style>
     /* ─── Design tokens ──────────────────────────────────────────────── */
     :root {
-      --bg:            #000000;
-      --panel:         #111111;
+      --bg:            transparent;
+      --panel:         #111418;
       --text:          #f0f0f0;
       --muted:         #606060;
       --accent:        #c0392b;
@@ -78,7 +78,7 @@
       font-size: 7px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--muted);
+      color: var(--text);
       line-height: 1;
       text-align: center;
     }
@@ -136,14 +136,6 @@
       overflow: hidden;
     }
 
-    .mode-label {
-      font-size: 7px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 1px;
-    }
-
     .time {
       font-variant-numeric: tabular-nums;
       font-weight: 200;
@@ -193,10 +185,9 @@
       fill: currentColor;
     }
 
-    /* dim controls in clock mode */
+    /* hide controls in clock mode */
     .app[data-mode="clock"] .controls {
-      opacity: 0.2;
-      pointer-events: none;
+      display: none;
     }
 
 
@@ -218,7 +209,6 @@
   <!-- main -->
   <div class="main">
     <div class="display">
-      <div class="mode-label" id="modeLabel">Clock</div>
       <div class="time" id="timeDisplay">00:00:00</div>
     </div>
 
@@ -251,8 +241,8 @@
     scale:             1,           // window scale multiplier (1 = 200×100, 2 = 400×200, …)
 
     colors: {
-      bg:          "#000000",
-      panel:       "#111111",
+      bg:          "#000000", // set as --bg CSS variable to use; currently overridden to transparent below
+      panel:       "#111418",
       text:        "#f0f0f0",
       muted:       "#606060",
       accent:      "#c0392b",
@@ -263,7 +253,7 @@
   // Apply color config to CSS variables
   const R = document.documentElement;
   R.style.setProperty("--scale",        CONFIG.scale);
-  R.style.setProperty("--bg",           CONFIG.colors.bg);
+  R.style.setProperty("--bg",           "transparent"); // change to CONFIG.colors.bg to restore solid background
   R.style.setProperty("--panel",        CONFIG.colors.panel);
   R.style.setProperty("--text",         CONFIG.colors.text);
   R.style.setProperty("--muted",        CONFIG.colors.muted);
@@ -273,7 +263,6 @@
   // ─── Element refs ──────────────────────────────────────────────────────────
   const app         = document.getElementById("app");
   const modeSwitch  = document.getElementById("modeSwitch");
-  const modeLabel   = document.getElementById("modeLabel");
   const timeDisplay = document.getElementById("timeDisplay");
   const playBtn     = document.getElementById("playBtn");
   const playIcon    = document.getElementById("playIcon");
@@ -344,7 +333,6 @@
     mode = m;
     app.dataset.mode        = m;
     modeSwitch.dataset.mode = m;
-    modeLabel.textContent   = m === "clock" ? "Clock" : "Stopwatch";
     render();
     fitFont();
   }

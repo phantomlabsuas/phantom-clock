@@ -40,10 +40,5 @@ if __name__ == "__main__":
     print(f"  Network: {network_url}")
     print("Press Ctrl+C to stop.")
 
-    webbrowser.open(local_url)
+    server.serve_forever()
 
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nServer stopped.")
-        server.shutdown()
