@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clock / Stopwatch</title>
+  <style>
+    /* ─── Design tokens ──────────────────────────────────────────────── */
+    :root {
+      --bg:            #000000;
+      --panel:         #111111;
+      --text:          #f0f0f0;
+      --muted:         #606060;
+      --accent:        #c0392b;
+      --accent-hover:  #e74c3c;
+      --btn-bg:        #1a1a1a;
+      --btn-border:    #2a2a2a;
+      --toggle-off:    #2e2e2e;
+      --toggle-on:     #c0392b;
+      --radius:        8px;
+      --font:          Inter, 'Segoe UI', Arial, sans-serif;
+      --scale:         1;    /* uniform scale — change to 2, 3… to enlarge */
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ─── App shell ──────────────────────────────────────────────────── */
+    .app {
+      width:  200px;
+      height: 100px;
+      transform: scale(var(--scale));
+      transform-origin: center;
+
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 5px;
+      padding: 5px;
+      background: var(--bg);
+    }
+
+    /* ─── Left sidebar ───────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--panel);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toggle-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .toggle-label {
+      font-size: 7px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      line-height: 1;
+      text-align: center;
+    }
+
+    /* vertical pill toggle */
+    .switch {
+      position: relative;
+      width: 18px;
+      height: 34px;
+      background: var(--toggle-off);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.22s ease;
+      flex-shrink: 0;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 12px;
+      height: 12px;
+      background: var(--text);
+      border-radius: 50%;
+      transition: transform 0.22s ease;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    }
+
+    .switch[data-mode="stopwatch"] {
+      background: var(--toggle-on);
+    }
+
+    .switch[data-mode="stopwatch"]::after {
+      transform: translateY(16px);
+    }
+
+    /* ─── Main panel ─────────────────────────────────────────────────── */
+    .main {
+      background: var(--panel);
+      border-radius: var(--radius);
+      padding: 5px 8px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    /* display area */
+    .display {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .mode-label {
+      font-size: 7px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1px;
+    }
+
+    .time {
+      font-variant-numeric: tabular-nums;
+      font-weight: 200;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      white-space: nowrap;
+      font-size: 19px; /* overridden by fitFont() */
+      display: block;
+    }
+
+    /* controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn {
+      width:  22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--btn-border);
+      background: var(--btn-bg);
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease, background 0.12s ease;
+      flex-shrink: 0;
+    }
+
+    .btn:hover  { transform: scale(1.06); }
+    .btn:active { transform: scale(0.94); }
+
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+    .btn svg {
+      width: 44%;
+      height: 44%;
+      fill: currentColor;
+    }
+
+    /* dim controls in clock mode */
+    .app[data-mode="clock"] .controls {
+      opacity: 0.2;
+      pointer-events: none;
+    }
+
+
+  </style>
+</head>
+<body>
+
+<div class="app" id="app" data-mode="clock">
+
+  <!-- sidebar -->
+  <div class="sidebar">
+    <div class="toggle-wrap">
+      <span class="toggle-label" id="topLabel">CLK</span>
+      <div class="switch" id="modeSwitch" data-mode="clock" title="Toggle clock / stopwatch"></div>
+      <span class="toggle-label" id="botLabel">SW</span>
+    </div>
+  </div>
+
+  <!-- main -->
+  <div class="main">
+    <div class="display">
+      <div class="mode-label" id="modeLabel">Clock</div>
+      <div class="time" id="timeDisplay">00:00:00</div>
+    </div>
+
+    <div class="controls">
+      <!-- play / pause -->
+      <button class="btn primary" id="playBtn" title="Play / Pause" aria-label="Play/Pause">
+        <svg id="playIcon" viewBox="0 0 24 24">
+          <!-- play triangle -->
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </button>
+
+      <!-- reset -->
+      <button class="btn" id="resetBtn" title="Reset" aria-label="Reset">
+        <!-- clockwise-arrow icon -->
+        <svg viewBox="0 0 24 24">
+          <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── User-configurable design / behaviour ──────────────────────────────────
+  const CONFIG = {
+    defaultMode:       "clock",     // "clock" | "stopwatch"
+    clock24h:          true,
+    showCentiseconds:  true,        // stopwatch sub-second display
+    scale:             1,           // window scale multiplier (1 = 200×100, 2 = 400×200, …)
+
+    colors: {
+      bg:          "#000000",
+      panel:       "#111111",
+      text:        "#f0f0f0",
+      muted:       "#606060",
+      accent:      "#c0392b",
+      accentHover: "#e74c3c",
+    }
+  };
+
+  // Apply color config to CSS variables
+  const R = document.documentElement;
+  R.style.setProperty("--scale",        CONFIG.scale);
+  R.style.setProperty("--bg",           CONFIG.colors.bg);
+  R.style.setProperty("--panel",        CONFIG.colors.panel);
+  R.style.setProperty("--text",         CONFIG.colors.text);
+  R.style.setProperty("--muted",        CONFIG.colors.muted);
+  R.style.setProperty("--accent",       CONFIG.colors.accent);
+  R.style.setProperty("--accent-hover", CONFIG.colors.accentHover);
+
+  // ─── Element refs ──────────────────────────────────────────────────────────
+  const app         = document.getElementById("app");
+  const modeSwitch  = document.getElementById("modeSwitch");
+  const modeLabel   = document.getElementById("modeLabel");
+  const timeDisplay = document.getElementById("timeDisplay");
+  const playBtn     = document.getElementById("playBtn");
+  const playIcon    = document.getElementById("playIcon");
+  const resetBtn    = document.getElementById("resetBtn");
+
+  // ─── State ─────────────────────────────────────────────────────────────────
+  let mode = CONFIG.defaultMode;
+
+  let swRunning  = false;
+  let swStart    = 0;   // performance.now() at last resume
+  let swAccum    = 0;   // ms accumulated before current run
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+  const pad = (v, n = 2) => String(v).padStart(n, "0");
+
+  function clockText(d) {
+    let h = d.getHours();
+    if (!CONFIG.clock24h) h = h % 12 || 12;
+    return `${pad(h)}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function swText(ms) {
+    const cs   = Math.floor((ms % 1000) / 10);
+    const ss   = Math.floor(ms / 1000) % 60;
+    const mm   = Math.floor(ms / 60000) % 60;
+    const hh   = Math.floor(ms / 3600000);
+    const base = `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+    return CONFIG.showCentiseconds ? `${base}.${pad(cs)}` : base;
+  }
+
+  function elapsed() {
+    return swAccum + (swRunning ? performance.now() - swStart : 0);
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+  function render() {
+    if (mode === "clock") {
+      timeDisplay.textContent = clockText(new Date());
+    } else {
+      timeDisplay.textContent = swText(elapsed());
+    }
+  }
+
+  // ─── Play icon ─────────────────────────────────────────────────────────────
+  function syncPlayIcon() {
+    if (swRunning) {
+      // pause (two bars)
+      playIcon.innerHTML =
+        `<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>`;
+    } else {
+      // play triangle
+      playIcon.innerHTML = `<path d="M8 5v14l11-7z"/>`;
+    }
+  }
+
+  // ─── Fit font to fill display width ─────────────────────────────────────
+  function fitFont() {
+    const availW = timeDisplay.parentElement.clientWidth;
+    if (availW === 0) return;
+    timeDisplay.style.fontSize = '100px';
+    const textW = timeDisplay.scrollWidth;
+    if (textW === 0) return;
+    timeDisplay.style.fontSize = Math.floor(100 * availW / textW) + 'px';
+  }
+
+  // ─── Mode switch ───────────────────────────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    app.dataset.mode        = m;
+    modeSwitch.dataset.mode = m;
+    modeLabel.textContent   = m === "clock" ? "Clock" : "Stopwatch";
+    render();
+    fitFont();
+  }
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
+  function toggleMode() {
+    setMode(mode === "clock" ? "stopwatch" : "clock");
+  }
+
+  function togglePlay() {
+    if (mode !== "stopwatch") return;
+    if (swRunning) {
+      swAccum   = elapsed();
+      swRunning = false;
+    } else {
+      swStart   = performance.now();
+      swRunning = true;
+    }
+    syncPlayIcon();
+    render();
+  }
+
+  function resetSW() {
+    if (mode !== "stopwatch") return;
+    swRunning = false;
+    swStart   = 0;
+    swAccum   = 0;
+    syncPlayIcon();
+    render();
+  }
+
+  // ─── Event listeners ───────────────────────────────────────────────────────
+  modeSwitch.addEventListener("click", toggleMode);
+  playBtn.addEventListener("click", togglePlay);
+  resetBtn.addEventListener("click", resetSW);
+
+  // ─── Boot ──────────────────────────────────────────────────────────────────
+  setMode(CONFIG.defaultMode);
+  syncPlayIcon();
+  setInterval(render, 50);   // 20 fps — smooth enough for cs precision  window.addEventListener('resize', fitFont);</script>
+</body>
+</html>
