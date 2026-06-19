@@ -35,6 +35,7 @@ def _load_config() -> dict:
 _config = _load_config()
 HOST = _config.get("host", "0.0.0.0")
 PORT = int(_config.get("port", 5005))
+EXPIRE_FLASH_S = int(_config.get("timer_expire_flash_seconds", 5))
 
 
 class NoCacheHandler(SimpleHTTPRequestHandler):
@@ -45,6 +46,7 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         if self.path in ("/", "/index.html"):
             html = (NoCacheHandler._base / "index.html").read_text(encoding="utf-8")
             html = html.replace("{{VERSION}}", APP_VERSION)
+            html = html.replace("{{EXPIRE_FLASH_S}}", str(EXPIRE_FLASH_S))
             body = html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

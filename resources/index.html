@@ -126,16 +126,40 @@
     }
 
     /* --- Flash animation (timer reaches zero) ------------------------- */
-    @keyframes flash-zero {
-      0%   { color: var(--text); }
-      20%  { color: var(--accent-hover); }
-      45%  { color: var(--text); }
-      70%  { color: var(--accent-hover); }
-      100% { color: var(--text); }
+    /* 5 flashes over --flash-duration (default 5 s):                   */
+    /* each cycle = 20% = 1 s → 10% on (0.5 s), 10% off (0.5 s)       */
+    /* last flash is dimmed to give a fading-out feel                   */
+    @keyframes flash-expired {
+      0%  { background-color: transparent; }
+      2%  { background-color: rgba(200, 30, 30, 0.75); }
+      8%  { background-color: rgba(200, 30, 30, 0.75); }
+      10% { background-color: transparent; }
+
+      20% { background-color: transparent; }
+      22% { background-color: rgba(200, 30, 30, 0.75); }
+      28% { background-color: rgba(200, 30, 30, 0.75); }
+      30% { background-color: transparent; }
+
+      40% { background-color: transparent; }
+      42% { background-color: rgba(200, 30, 30, 0.75); }
+      48% { background-color: rgba(200, 30, 30, 0.75); }
+      50% { background-color: transparent; }
+
+      60% { background-color: transparent; }
+      62% { background-color: rgba(200, 30, 30, 0.75); }
+      68% { background-color: rgba(200, 30, 30, 0.75); }
+      70% { background-color: transparent; }
+
+      80%  { background-color: transparent; }
+      82%  { background-color: rgba(200, 30, 30, 0.75); }
+      88%  { background-color: rgba(200, 30, 30, 0.75); }
+      90%  { background-color: transparent; }
+      100% { background-color: transparent; }
     }
 
-    .time.flash {
-      animation: flash-zero 0.7s ease;
+    .flash-expired {
+      animation: flash-expired var(--flash-duration) ease forwards;
+      border-radius: 4px;
     }
   </style>
 </head>
@@ -191,6 +215,7 @@
   R.style.setProperty("--accent-hover", CONFIG.colors.accentHover);
   R.style.setProperty("--btn-bg",       CONFIG.colors.btnBg);
   R.style.setProperty("--btn-border",   CONFIG.colors.btnBorder);
+  R.style.setProperty("--flash-duration", "{{EXPIRE_FLASH_S}}s");
 
   // --- DOM refs -------------------------------------------------------
   const widget    = document.getElementById("widget");
@@ -263,12 +288,14 @@
   }
 
   // --- Flash at zero --------------------------------------------------
-  function flashTimerDisplay() {
-    tmDisplay.classList.remove('flash');
-    void tmDisplay.offsetWidth; // force reflow so animation restarts
-    tmDisplay.classList.add('flash');
-    tmDisplay.addEventListener('animationend', () => {
-      tmDisplay.classList.remove('flash');
+  function flashExpired() {
+    // Target the visible display: swDisplay when in stopwatch mode, tmDisplay otherwise
+    const el = (mode === 'stopwatch') ? swDisplay : tmDisplay;
+    el.classList.remove('flash-expired');
+    void el.offsetWidth; // force reflow so animation restarts
+    el.classList.add('flash-expired');
+    el.addEventListener('animationend', () => {
+      el.classList.remove('flash-expired');
     }, { once: true });
   }
 
@@ -289,10 +316,8 @@
       tm.running = false;
       tm.h = 0; tm.m = 0; tm.s = 0;
       updateTimerSegClickable();
-      if (mode === 'timer') {
-        syncPlayIcon();
-        flashTimerDisplay();
-      }
+      if (mode === 'timer') syncPlayIcon();
+      flashExpired();
     }
 
     if (mode === 'stopwatch') {
