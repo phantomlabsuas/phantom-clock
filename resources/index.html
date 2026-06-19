@@ -165,6 +165,7 @@
 
   function fitFont() {
     const h = document.getElementById("widget").clientHeight;
+    if (h === 0) { requestAnimationFrame(fitFont); return; }
     timeDisplay.style.fontSize = Math.round(h * 0.40) + "px";
   }
 
@@ -194,6 +195,8 @@
   window.addEventListener("resize", fitFont);
 
   fitFont(); render(); syncPlayIcon();
+  // Re-run fitFont after first paint in case clientHeight was 0 on initial call
+  requestAnimationFrame(() => { fitFont(); render(); });
   setInterval(render, 50);
 </script>
 </body>

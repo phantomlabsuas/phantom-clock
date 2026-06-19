@@ -1,2 +1,2 @@
 @echo off
-python "%~dp0server.py"
+python "%~dp0src\phantom_clock\server.py"

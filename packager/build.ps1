@@ -4,7 +4,7 @@ param(
 )
 
 $root    = (Resolve-Path "$PSScriptRoot\..").Path
-$release = Join-Path $root "dist"
+$release = Join-Path $root "release\package"
 $work    = Join-Path $PSScriptRoot "build"
 
 # Generate Windows version metadata from APP_VERSION in server.py
@@ -31,16 +31,16 @@ Write-Host "[2/2] Building phantom-clock.exe ..."
 python -m PyInstaller `
     --onefile `
     $consoleFlag `
-    "--add-data=$root\index.html;." `
-    "--add-data=$root\single_instance.py;." `
-    "--add-data=$root\config.json;." `
+    "--add-data=$root\resources\index.html;resources" `
+    "--add-data=$root\config\config.json;config" `
+    "--paths=$root\src\phantom_clock" `
     --hidden-import psutil `
     "--distpath=$release" `
     "--workpath=$work" `
     "--specpath=$PSScriptRoot" `
     "--version-file=$versionFile" `
     --name phantom-clock `
-    "$root\server.py"
+    "$root\src\phantom_clock\server.py"
 
 Write-Host ""
 $exe = Join-Path $release "phantom-clock.exe"

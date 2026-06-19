@@ -9,7 +9,7 @@ from pathlib import Path
 root        = Path(sys.argv[1])
 output_file = Path(sys.argv[2])
 
-server_src = (root / "server.py").read_text(encoding="utf-8")
+server_src = (root / "src" / "phantom_clock" / "server.py").read_text(encoding="utf-8")
 m = re.search(r"APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]", server_src)
 if not m:
     print("ERROR: APP_VERSION not found in server.py", file=sys.stderr)

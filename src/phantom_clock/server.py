@@ -13,18 +13,20 @@ APP_VERSION = "1.0.0"
 
 _CONFIG_FILE = Path(__file__).parent / "config.json"
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 def _load_config() -> dict:
-    # When frozen, prefer config.json next to the exe (user-editable),
+    # When frozen, prefer config/config.json next to the exe (user-editable),
     # fall back to the bundled copy inside the extracted temp dir.
     if getattr(sys, "frozen", False):
         exe_dir = Path(sys.executable).parent
-        candidate = exe_dir / "config.json"
+        candidate = exe_dir / "config" / "config.json"
         if candidate.exists():
             config_path = candidate
         else:
-            config_path = Path(sys._MEIPASS) / "config.json"
+            config_path = Path(sys._MEIPASS) / "config" / "config.json"
     else:
-        config_path = _CONFIG_FILE
+        config_path = _PROJECT_ROOT / "config" / "config.json"
     try:
         return json.loads(config_path.read_text(encoding="utf-8"))
     except Exception:
@@ -84,12 +86,12 @@ if __name__ == "__main__":
 
         # Support both normal execution and PyInstaller onefile bundle
         if getattr(sys, "frozen", False):
-            base_dir = Path(sys._MEIPASS)
+            resources_dir = Path(sys._MEIPASS) / "resources"
         else:
-            base_dir = Path(__file__).parent
+            resources_dir = _PROJECT_ROOT / "resources"
 
-        NoCacheHandler._base = base_dir
-        os.chdir(base_dir)  # needed for SimpleHTTPRequestHandler static file fallback
+        NoCacheHandler._base = resources_dir
+        os.chdir(resources_dir)  # needed for SimpleHTTPRequestHandler static file fallback
 
         server = ThreadingHTTPServer((HOST, PORT), NoCacheHandler)
 

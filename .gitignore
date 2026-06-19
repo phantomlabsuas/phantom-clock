@@ -7,8 +7,8 @@ packager/build/
 packager/phantom-clock.spec
 packager/win_version_gen.txt
 
-# Compiled output — built exe goes here, not tracked in source
-dist/
+# Release output — rebuilt by build script, not tracked
+release/
 
 # Crash logs written at runtime
 phantom-clock-crash.log
