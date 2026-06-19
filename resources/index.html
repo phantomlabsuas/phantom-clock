@@ -97,11 +97,59 @@
       color: var(--text);
       line-height: 1;
     }
+
+    /* --- Timer segments ----------------------------------------------- */
+    .tm-seg {
+      border-radius: 3px;
+      transition: color 0.12s ease;
+    }
+
+    .tm-seg.clickable {
+      cursor: pointer;
+    }
+
+    .tm-seg.clickable:hover {
+      color: var(--accent-hover);
+    }
+
+    /* --- Time area (anchor widget width to the wider stopwatch format) --- */
+    .time-area {
+      position: relative;
+    }
+
+    #tmDisplay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* --- Flash animation (timer reaches zero) ------------------------- */
+    @keyframes flash-zero {
+      0%   { color: var(--text); }
+      20%  { color: var(--accent-hover); }
+      45%  { color: var(--text); }
+      70%  { color: var(--accent-hover); }
+      100% { color: var(--text); }
+    }
+
+    .time.flash {
+      animation: flash-zero 0.7s ease;
+    }
   </style>
 </head>
 <body>
 
 <div class="widget" id="widget">
+
+  <!-- Mode toggle: leftmost -->
+  <button class="btn" id="modeBtn" title="Switch to Timer" aria-label="Switch to Timer">
+    <svg id="modeIcon" viewBox="0 0 24 24">
+      <!-- hourglass (shown when in stopwatch mode → click to go to timer) -->
+      <path d="M6 2v6l4 4-4 4v6h12v-6l-4-4 4-4V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm0-9L12 11.5 8 7.5V4h8v3.5z"/>
+    </svg>
+  </button>
 
   <button class="btn primary" id="playBtn" title="Play / Pause" aria-label="Play/Pause">
     <svg id="playIcon" viewBox="0 0 24 24">
@@ -115,7 +163,11 @@
     </svg>
   </button>
 
-  <div class="time" id="timeDisplay">00:00:00.00</div>
+  <!-- Time area: swDisplay stays in flow (drives widget width); tmDisplay overlays it -->
+  <div class="time-area">
+    <div class="time" id="swDisplay">00:00:00.00</div>
+    <div class="time" id="tmDisplay" style="visibility:hidden"><span class="tm-seg clickable" id="tmH">00</span><span class="tm-sep">:</span><span class="tm-seg clickable" id="tmM">00</span><span class="tm-sep">:</span><span class="tm-seg clickable" id="tmS">00</span></div>
+  </div>
 
 </div>
 
@@ -140,22 +192,88 @@
   R.style.setProperty("--btn-bg",       CONFIG.colors.btnBg);
   R.style.setProperty("--btn-border",   CONFIG.colors.btnBorder);
 
-  const timeDisplay = document.getElementById("timeDisplay");
-  const playBtn     = document.getElementById("playBtn");
-  const playIcon    = document.getElementById("playIcon");
-  const resetBtn    = document.getElementById("resetBtn");
+  // --- DOM refs -------------------------------------------------------
+  const widget    = document.getElementById("widget");
+  const swDisplay = document.getElementById("swDisplay");
+  const tmDisplay = document.getElementById("tmDisplay");
+  const tmH       = document.getElementById("tmH");
+  const tmM       = document.getElementById("tmM");
+  const tmS       = document.getElementById("tmS");
+  const playBtn   = document.getElementById("playBtn");
+  const playIcon  = document.getElementById("playIcon");
+  const resetBtn  = document.getElementById("resetBtn");
+  const modeBtn   = document.getElementById("modeBtn");
+  const modeIcon  = document.getElementById("modeIcon");
 
-  let running = false;
-  let start   = 0;
-  let accum   = 0;
+  // --- Mode & state ---------------------------------------------------
+  let mode = 'stopwatch'; // 'stopwatch' | 'timer'
 
-  const pad = (v, n = 2) => String(v).padStart(n, "0");
+  // Stopwatch state
+  const sw = { running: false, start: 0, accum: 0 };
 
-  function elapsed() {
-    return accum + (running ? performance.now() - start : 0);
+  // Timer state
+  const tm = {
+    running: false,
+    remainingAtStart: 0, // ms captured when last started/resumed
+    start: 0,            // performance.now() of last start/resume
+    h: 0, m: 0, s: 0    // editable set values (used when not running)
+  };
+
+  // --- Utility --------------------------------------------------------
+  const pad = (v) => String(Math.floor(v)).padStart(2, "0");
+
+  function swElapsed() {
+    return sw.accum + (sw.running ? performance.now() - sw.start : 0);
   }
 
-  function formatTime(ms) {
+  function tmRemaining() {
+    if (!tm.running) return tm.h * 3600000 + tm.m * 60000 + tm.s * 1000;
+    return Math.max(0, tm.remainingAtStart - (performance.now() - tm.start));
+  }
+
+  // --- Icon strings ---------------------------------------------------
+  const ICON_PLAY      = '<path d="M8 5v14l11-7z"/>';
+  const ICON_PAUSE     = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+  const ICON_HOURGLASS = '<path d="M6 2v6l4 4-4 4v6h12v-6l-4-4 4-4V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm0-9L12 11.5 8 7.5V4h8v3.5z"/>';
+  const ICON_STOPWATCH = '<path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>';
+
+  // --- Sync UI --------------------------------------------------------
+  function syncPlayIcon() {
+    const running = mode === 'stopwatch' ? sw.running : tm.running;
+    playIcon.innerHTML = running ? ICON_PAUSE : ICON_PLAY;
+  }
+
+  function syncModeBtn() {
+    if (mode === 'stopwatch') {
+      modeIcon.innerHTML = ICON_HOURGLASS;
+      modeBtn.title = "Switch to Timer";
+      modeBtn.setAttribute("aria-label", "Switch to Timer");
+    } else {
+      modeIcon.innerHTML = ICON_STOPWATCH;
+      modeBtn.title = "Switch to Stopwatch";
+      modeBtn.setAttribute("aria-label", "Switch to Stopwatch");
+    }
+  }
+
+  function updateTimerSegClickable() {
+    const c = !tm.running;
+    tmH.classList.toggle('clickable', c);
+    tmM.classList.toggle('clickable', c);
+    tmS.classList.toggle('clickable', c);
+  }
+
+  // --- Flash at zero --------------------------------------------------
+  function flashTimerDisplay() {
+    tmDisplay.classList.remove('flash');
+    void tmDisplay.offsetWidth; // force reflow so animation restarts
+    tmDisplay.classList.add('flash');
+    tmDisplay.addEventListener('animationend', () => {
+      tmDisplay.classList.remove('flash');
+    }, { once: true });
+  }
+
+  // --- Format ---------------------------------------------------------
+  function formatSwTime(ms) {
     const cs  = Math.floor((ms % 1000) / 10);
     const ss  = Math.floor(ms / 1000) % 60;
     const mm  = Math.floor(ms / 60000) % 60;
@@ -164,39 +282,104 @@
     return CONFIG.showCentiseconds ? base + "." + pad(cs) : base;
   }
 
-  function fitFont() {
-    const h = document.getElementById("widget").clientHeight;
-    if (h === 0) { requestAnimationFrame(fitFont); return; }
-    timeDisplay.style.fontSize = Math.round(h * 0.40) + "px";
-  }
-
+  // --- Render ---------------------------------------------------------
   function render() {
-    timeDisplay.textContent = formatTime(elapsed());
+    // Background timer expiry check — works even while viewing stopwatch
+    if (tm.running && tmRemaining() <= 0) {
+      tm.running = false;
+      tm.h = 0; tm.m = 0; tm.s = 0;
+      updateTimerSegClickable();
+      if (mode === 'timer') {
+        syncPlayIcon();
+        flashTimerDisplay();
+      }
+    }
+
+    if (mode === 'stopwatch') {
+      swDisplay.textContent = formatSwTime(swElapsed());
+    } else {
+      if (tm.running) {
+        const totalS = Math.floor(tmRemaining() / 1000);
+        tmH.textContent = pad(Math.floor(totalS / 3600));
+        tmM.textContent = pad(Math.floor(totalS / 60) % 60);
+        tmS.textContent = pad(totalS % 60);
+      } else {
+        tmH.textContent = pad(tm.h);
+        tmM.textContent = pad(tm.m);
+        tmS.textContent = pad(tm.s);
+      }
+    }
   }
 
-  function syncPlayIcon() {
-    playIcon.innerHTML = running
-      ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
-      : '<path d="M8 5v14l11-7z"/>';
+  function fitFont() {
+    const h = widget.clientHeight;
+    if (h === 0) { requestAnimationFrame(fitFont); return; }
+    const fs = Math.round(h * 0.40) + "px";
+    swDisplay.style.fontSize = fs;
+    tmDisplay.style.fontSize = fs;
   }
 
+  // --- Actions --------------------------------------------------------
   function togglePlay() {
-    if (running) { accum = elapsed(); running = false; }
-    else { start = performance.now(); running = true; }
+    if (mode === 'stopwatch') {
+      if (sw.running) { sw.accum = swElapsed(); sw.running = false; }
+      else            { sw.start = performance.now(); sw.running = true; }
+    } else {
+      if (tm.running) {
+        // Pause: capture remaining into h/m/s
+        const totalS = Math.floor(tmRemaining() / 1000);
+        tm.running   = false;
+        tm.h = Math.floor(totalS / 3600);
+        tm.m = Math.floor(totalS / 60) % 60;
+        tm.s = totalS % 60;
+      } else {
+        const totalMs = tm.h * 3600000 + tm.m * 60000 + tm.s * 1000;
+        if (totalMs === 0) return; // nothing to count down
+        tm.remainingAtStart = totalMs;
+        tm.start            = performance.now();
+        tm.running          = true;
+      }
+      updateTimerSegClickable();
+    }
     syncPlayIcon();
   }
 
-  function resetSW() {
-    running = false; start = 0; accum = 0;
-    syncPlayIcon(); render();
+  function resetCurrent() {
+    if (mode === 'stopwatch') {
+      sw.running = false; sw.start = 0; sw.accum = 0;
+    } else {
+      tm.running = false; tm.remainingAtStart = 0; tm.start = 0;
+      tm.h = 0; tm.m = 0; tm.s = 0;
+      updateTimerSegClickable();
+    }
+    syncPlayIcon();
+    render();
   }
 
+  function toggleMode() {
+    mode = (mode === 'stopwatch') ? 'timer' : 'stopwatch';
+    swDisplay.style.visibility = (mode === 'stopwatch') ? 'visible' : 'hidden';
+    tmDisplay.style.visibility = (mode === 'timer')     ? 'visible' : 'hidden';
+    syncModeBtn();
+    syncPlayIcon();
+    fitFont();
+    render();
+  }
+
+  // --- Event listeners ------------------------------------------------
   playBtn.addEventListener("click", togglePlay);
-  resetBtn.addEventListener("click", resetSW);
+  resetBtn.addEventListener("click", resetCurrent);
+  modeBtn.addEventListener("click", toggleMode);
+
+  tmH.addEventListener("click", () => { if (!tm.running) { tm.h = Math.min(99, tm.h + 1); render(); } });
+  tmM.addEventListener("click", () => { if (!tm.running) { tm.m = (tm.m + 1) % 60;        render(); } });
+  tmS.addEventListener("click", () => { if (!tm.running) { tm.s = (tm.s + 1) % 60;        render(); } });
+
   window.addEventListener("resize", fitFont);
 
-  fitFont(); render(); syncPlayIcon();
-  // Re-run fitFont after first paint in case clientHeight was 0 on initial call
+  // --- Init -----------------------------------------------------------
+  fitFont(); render(); syncPlayIcon(); syncModeBtn();
+  // Re-run after first paint in case clientHeight was 0 on initial call
   requestAnimationFrame(() => { fitFont(); render(); });
   setInterval(render, 50);
 </script>
