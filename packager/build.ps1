@@ -19,15 +19,15 @@ $consoleFlag = if ($Console) { "-c" } else { "-w" }
 Write-Host "[1/2] Installing dependencies..."
 python -m pip install pyinstaller psutil --quiet
 
-# Close phantom-clock.exe if running, otherwise PyInstaller cannot overwrite it
-$proc = Get-Process -Name "phantom-clock" -ErrorAction SilentlyContinue
+# Close PhantomClock.exe if running, otherwise PyInstaller cannot overwrite it
+$proc = Get-Process -Name "PhantomClock" -ErrorAction SilentlyContinue
 if ($proc) {
-    Write-Host "Stopping running phantom-clock.exe..."
+    Write-Host "Stopping running PhantomClock.exe..."
     $proc | Stop-Process -Force
     Start-Sleep -Milliseconds 500
 }
 
-Write-Host "[2/2] Building phantom-clock.exe ..."
+Write-Host "[2/2] Building PhantomClock.exe ..."
 python -m PyInstaller `
     --onefile `
     $consoleFlag `
@@ -39,11 +39,11 @@ python -m PyInstaller `
     "--workpath=$work" `
     "--specpath=$PSScriptRoot" `
     "--version-file=$versionFile" `
-    --name phantom-clock `
+    --name PhantomClock `
     "$root\src\phantom_clock\server.py"
 
 Write-Host ""
-$exe = Join-Path $release "phantom-clock.exe"
+$exe = Join-Path $release "PhantomClock.exe"
 if (Test-Path $exe) {
     Write-Host "Done. Exe ready at: $exe"
 } else {
