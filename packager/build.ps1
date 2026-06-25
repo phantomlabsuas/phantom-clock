@@ -4,15 +4,18 @@ param(
 )
 
 $root    = (Resolve-Path "$PSScriptRoot\..").Path
-$release = Join-Path $root "release\package"
 $work    = Join-Path $PSScriptRoot "build"
 
-# Generate Windows version metadata from APP_VERSION in server.py
+# Generate Windows version metadata from version.json
 $genScript   = Join-Path $PSScriptRoot "gen_version.py"
 $versionFile = Join-Path $PSScriptRoot "win_version_gen.txt"
 
 python $genScript $root $versionFile
-if ($LASTEXITCODE -ne 0) { Write-Error "Failed to read version from server.py"; exit 1 }
+if ($LASTEXITCODE -ne 0) { Write-Error "Failed to read version from version.json"; exit 1 }
+
+$version = (Get-Content (Join-Path $root "version.json") | ConvertFrom-Json).version
+$release = Join-Path $root "release\package\PhantomClock_$version"
+New-Item -ItemType Directory -Force -Path $release | Out-Null
 
 $consoleFlag = if ($Console) { "-c" } else { "-w" }
 

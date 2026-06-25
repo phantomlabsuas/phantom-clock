@@ -9,7 +9,7 @@ import json
 import sys
 import os
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 _CONFIG_FILE = Path(__file__).parent / "config.json"
 
